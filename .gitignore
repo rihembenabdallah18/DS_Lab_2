@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Secrets: API keys and Hugging Face tokens never go in git
+.env
+*.token
+hf_token*
+
+# Model and dataset caches
+.cache/
+hf_cache/
+
+# Excel lock files while a sheet is open
+~$*.xlsx
+
+# OS / editors
+.DS_Store
+.vscode/
+.idea/

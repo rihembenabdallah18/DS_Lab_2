@@ -1,0 +1,25 @@
+# Generator SLMs (plan §4). `key` is the short name used in file names and configs.
+# Model identity is hidden from the annotator: trace IDs are opaque hashes.
+
+generators:
+  - key: qwen2.5-3b
+    hf_id: Qwen/Qwen2.5-3B-Instruct
+    gated: false
+  - key: llama3.2-3b
+    hf_id: meta-llama/Llama-3.2-3B-Instruct
+    gated: true          # accept the licence on Hugging Face first (plan §9)
+    # Llama's chat template inserts today's date into the system header;
+    # pin it so prompts are identical across runs.
+    chat_template_kwargs:
+      date_string: "26 Jul 2024"
+  - key: phi4-mini
+    hf_id: microsoft/Phi-4-mini-instruct
+    gated: false
+
+reserve:
+  - key: gemma3-4b
+    hf_id: google/gemma-3-4b-it
+    gated: true          # one-click licence acceptance on Hugging Face
+
+# Kaggle T4 GPUs do not support bf16.
+dtype: float16

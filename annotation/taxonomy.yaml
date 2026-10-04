@@ -1,0 +1,53 @@
+# Machine-readable taxonomy. The annotation sheet's drop-downs, the label validator and
+# (after the freeze) the LLM-judge prompt are all built from this file.
+# Human-readable definitions, rules and examples live in codebook.md.
+#
+# v0 is a set of HYPOTHESES (plan §7.3) seeded from ReTraceQA (misinterpretation /
+# hallucination / reasoning) and ProcessBench. Stage A and the pilot will change it.
+# Every change is logged in changelog.md. After the freeze, set status: frozen.
+
+version: v0
+status: draft          # draft | frozen
+
+parents:
+  - id: MISREAD
+    name: Problem misreading
+    layer: grounding
+    children:
+      - {id: MISREAD.quantity, name: Misread quantity or relation, task: math}
+      - {id: MISREAD.target, name: Answers a different question than asked, task: both}
+      - {id: MISREAD.options, name: Misreads or ignores answer options, task: commonsense}
+
+  - id: PREMISE
+    name: Unsupported or false premise
+    layer: content
+    children:
+      - {id: PREMISE.fact, name: False or unverifiable world knowledge, task: both}
+      - {id: PREMISE.number, name: Invented number not in the problem, task: math}
+
+  - id: INFERENCE
+    name: Invalid inference or transformation
+    layer: reasoning
+    children:
+      - {id: INFERENCE.arithmetic, name: Arithmetic slip, task: math}
+      - {id: INFERENCE.operation, name: Wrong operation or set-up, task: math}
+      - {id: INFERENCE.leap, name: Unsupported leap or non-sequitur, task: both}
+
+  - id: OMISSION
+    name: Constraint or information omission
+    layer: grounding
+    children:
+      - {id: OMISSION.constraint, name: Drops a condition or step of the problem, task: both}
+      - {id: OMISSION.alternative, name: Fails to consider a better option, task: commonsense}
+
+  - id: INCONSISTENCY
+    name: Answer-reasoning inconsistency
+    layer: reasoning
+    children:
+      - {id: INCONSISTENCY.answer, name: Final answer contradicts the steps, task: both}
+      - {id: INCONSISTENCY.steps, name: A step contradicts an earlier step, task: both}
+
+  - id: OTHER
+    name: Other (describe in notes)
+    layer: none
+    children: []
