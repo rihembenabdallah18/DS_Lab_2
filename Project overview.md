@@ -1,350 +1,264 @@
-# Formal Project Plan: Developing a Unified Reasoning Failure Mode Taxonomy for Small Language Models in QA Reasoning
-
-## Executive summary
-
-This project will develop and empirically evaluate a unified taxonomy of reasoning failure modes for Small Language Models (SLMs) in question-answering reasoning, with a focus on mathematical and commonsense QA. The project treats observable reasoning traces as the object of study rather than assuming that final-answer correctness is sufficient evidence of sound reasoning.
-
-The study is structured around three research questions, but they will not be pursued with equal weight. The primary contribution is RQ1, which builds the taxonomy and identifies which failure modes are shared across mathematical and commonsense reasoning and which are task-specific. RQ2 is the second stage and uses the taxonomy to compare whether different SLMs exhibit similar or different failure profiles across tasks. RQ3 is the final stage and evaluates whether automated systems can reproduce parts of the human annotation process, using one general LLM judge across both tasks and one math-specific Process Reward Model (PRM) for mathematical error detection and localization.
-
-The core design uses one math dataset and one commonsense dataset, one unified human annotation framework designed from scratch, approximately three comparable instruction-tuned SLMs, and a researcher-led annotation process with qualitative supervisor review. ReTraceQA and ProcessBench will serve as methodological anchors, but their taxonomies will not be copied directly; instead, the project will construct its own categories informed by their strengths and limitations.
-
-## Project objective
-
-The objective of the project is to create a practical, interpretable, and empirically grounded taxonomy of reasoning failures that can be applied to SLM-generated QA traces across at least two different reasoning domains. The taxonomy must be detailed enough to diagnose meaningful failure patterns, but compact enough to remain usable in manual annotation and later automated evaluation.
-
-The project does not aim to prove anything about the models’ hidden internal reasoning processes. Instead, it studies the explicit text produced as a reasoning trace and asks whether that trace is valid, where it first becomes invalid, what type of failure occurs, and how those failures vary by task and model.
-
-A second objective is methodological. The project will examine whether process-aware evaluation tools can support scalable oversight of reasoning traces, while recognizing that automated judges are not automatically valid substitutes for human labeling and must be compared against a structured reference annotation.
-
-## Research questions and project order
-
-The project is organized around the following research questions:
-
-- **RQ1:** What failure modes are shared across math and commonsense reasoning, and which are task-specific?
-- **RQ2:** Do different SLMs fail in different ways, or do they share a common failure profile across tasks?
-- **RQ3:** How well can automated models detect and classify the proposed failure modes compared with human annotation?
-
-The operational order of the project is:
-
-1. **RQ1 first**
-2. **RQ2 second**
-3. **RQ3 last**
-
-This order is required by the dependency structure of the study. RQ1 must come first because it defines the taxonomy, the annotation codebook, the labeling rules, and the human reference dataset. RQ2 can only be answered after those labels exist, because comparing model failure profiles requires a stable category system applied consistently across all traces. RQ3 must come last because automated detection and classification cannot be evaluated until the target labels are frozen and the annotation framework is stable.
-
-## Scope of the project
-
-The project scope has been intentionally narrowed to remain feasible within a 3–4 month lab timeline while preserving scientific value. It focuses on two reasoning domains represented in QA format: mathematical reasoning and commonsense reasoning.
-
-The minimum scope includes:
-
-- One mathematical QA dataset.
-- One commonsense QA dataset.
-- Approximately three instruction-tuned SLMs.
-- One researcher-annotated trace corpus.
-- A unified taxonomy created from scratch.
-- One general LLM judge for both tasks.
-- One math-specific PRM for mathematical detection and localization only.
-
-The project explicitly excludes several larger extensions from the primary scope:
-
-- Training a new PRM from scratch.
-- Training a supervised failure classifier from the new annotations.
-- Covering many QA domains beyond math and commonsense.
-- Evaluating a large panel of automatic judges.
-- Running a full-scale multi-annotator reliability study.
-
-These excluded items are better framed as future thesis extensions rather than core lab deliverables.
-
-## Role of prior literature
-
-### ReTraceQA
-
-ReTraceQA is a central methodological reference because it evaluates SLM-generated reasoning traces in commonsense QA and distinguishes between valid traces, invalid traces, and process errors where the final answer is correct but the reasoning is flawed. It also provides a hierarchical annotation logic, first-error localization, and a structured trace-evaluation procedure that is directly relevant to this project.
-
-However, ReTraceQA’s taxonomy is intentionally coarse and limited to commonsense QA. The present project will borrow the ideas of trace validity, earliest-error identification, and process-aware annotation, but it will not directly adopt ReTraceQA’s fixed three-class structure because that would be too restrictive for a unified taxonomy spanning both math and commonsense reasoning.
-
-### ProcessBench
-
-ProcessBench is the main methodological reference for the mathematical side of the project. It evaluates whether automated systems can identify the earliest incorrect step in a mathematical reasoning process and compares prompted critic models with process reward models.
-
-Its main value for this project lies in two contributions: first, it provides a strong precedent for step-level process evaluation in math; second, it motivates the inclusion of a PRM as a specialized automated evaluator for mathematical reasoning. At the same time, ProcessBench is not a unified cross-task taxonomy project, so it must be used as inspiration for mathematical error analysis rather than as the full template for the study.
-
-### Broader reasoning-evaluation literature
-
-The broader process-evaluation literature supports the contrast between mathematical reasoning and commonsense reasoning and shows that observable reasoning traces can reveal failures hidden by final-answer accuracy alone. It also supports the use of step-level evaluators such as PRMs for mathematics and LLM critics or judges for broader reasoning-trace analysis.
-
-This literature justifies the central hypothesis of the project: some failure mechanisms may generalize across reasoning domains even if they appear differently on the surface. For example, losing a relevant constraint in a word problem and losing a relevant fact in commonsense QA may be domain-specific realizations of a more general grounding or omission failure.
-
-## Dataset selection
-
-### Mathematical reasoning dataset
-
-The recommended mathematical dataset is GSM8K because it is widely used for multi-step mathematical reasoning and verifier research, and it aligns naturally with process-supervision work. It is more suitable for this project than very advanced competition mathematics because it keeps manual annotation interpretable and manageable while still requiring nontrivial reasoning.
-
-### Commonsense reasoning dataset
-
-The recommended commonsense dataset is CommonsenseQA because it is a standard multiple-choice benchmark that requires commonsense knowledge and semantic reasoning rather than simple lexical matching. It is also well aligned with the type of commonsense trace evaluation used in ReTraceQA.
-
-### Scope of dataset coverage
-
-The project will start with one dataset per task and may expand only if time allows. This means that claims about “task-specific” failures must be worded carefully, because some observed differences may reflect the selected datasets rather than the full domains of mathematical and commonsense reasoning.
-
-## Model selection strategy
-
-The recommended design uses approximately three instruction-tuned SLMs from different families but of broadly comparable scale. Three models provide a practical middle ground: one model is insufficient for RQ2, two models make generalization difficult, and four or more models would substantially increase annotation volume.
-
-Model selection should follow the following criteria:
-
-- Open or accessible enough for reproducible generation.
-- Instruction-tuned rather than base-only.
-- Small enough to fit the available compute setup.
-- General-purpose rather than math-specialized for the main task comparison.
-- Able to produce explicit step-by-step reasoning traces in a stable format.
-
-A math-specialized generator could be studied later as an extension, but it should not be part of the primary three-model comparison because it would confound reasoning domain with model specialization.
-
-## Trace generation protocol
-
-Each selected question will be posed to every selected SLM using a fixed prompt template and fixed decoding protocol. The goal is to keep task and model comparisons meaningful by controlling the generation setting as much as possible.
-
-Each generated record should contain:
-
-- Question text and answer options if applicable.
-- Model prompt.
-- Raw generated response.
-- Extracted reasoning steps.
-- Extracted final answer.
-- Final-answer correctness.
-- Metadata such as model name, model version, decoding settings, and timestamp.
-
-The response format should explicitly request numbered reasoning steps followed by a clearly marked final answer. This improves consistency for human annotation and later automated evaluation, including step-level scoring by PRMs and critics.
-
-## Annotation philosophy
-
-The annotation process will focus on observable reasoning traces, not hidden internal cognition. A trace may therefore be coherent, flawed, incomplete, misleading, or inconsistent even when the final answer is correct. This distinction is essential because prior work has shown that final-answer accuracy can overestimate actual reasoning quality.
-
-The core annotation philosophy combines four principles:
-
-1. **Trace validity matters separately from answer correctness.**
-2. **The earliest independent failure should be identified when possible.**
-3. **Failure categories should be defined from the data, not copied mechanically from prior work.**
-4. **Later downstream mistakes should be separated from the first causal failure whenever possible.**
-
-This means a trace can be marked as a process error when the final answer is correct but the earlier steps are flawed. It also means that a later arithmetic mistake caused entirely by an earlier misunderstanding may be recorded as propagated rather than treated as the primary root failure.
-
-## Taxonomy-development method
-
-The taxonomy will be designed from scratch using an iterative codebook-development approach informed by prior reasoning-trace evaluation work. Prior literature will inform the researcher’s expectations, but the final categories must be grounded in the actual trace corpus.
-
-The recommended procedure is:
-
-1. Read an initial discovery subset from both tasks without fixing labels in advance.
-2. Write provisional descriptions of recurring failure mechanisms in plain language.
-3. Group similar descriptions into candidate categories.
-4. Merge categories that differ only superficially.
-5. Split categories that conflate meaningfully distinct error mechanisms.
-6. Define each category using explicit inclusion and exclusion rules.
-7. Pilot the codebook on a separate subset.
-8. Revise category definitions and decision rules.
-9. Freeze the taxonomy before the main annotation stage.
-
-The taxonomy should be hierarchical. A small set of shared high-level parent categories should capture task-neutral failure mechanisms, while optional child categories may capture domain-specific realizations. For example, a parent category such as unsupported inference or invalid transformation could appear in both tasks, while child categories distinguish arithmetic manipulation from commonsense causal leaps.
-
-## Recommended annotation schema
-
-Each trace should be annotated with a compact but expressive schema.
-
-| Field | Purpose |
-|---|---|
-| `trace_id` | Unique reference for analysis |
-| `task` | Math or commonsense |
-| `dataset` | Dataset source |
-| `item_id` | Original question ID |
-| `model_id` | Model source for RQ2 |
-| `answer_correct` | Outcome correctness |
-| `trace_valid` | Overall process validity |
-| `first_error_step` | Earliest erroneous step or none |
-| `primary_failure_parent` | High-level taxonomy label |
-| `primary_failure_child` | Optional fine-grained subtype |
-| `propagated_error` | Whether later mistakes flow from earlier ones |
-| `secondary_failure` | Optional additional independent failure |
-| `confidence` | Annotation confidence |
-| `notes` | Short rationale for difficult cases |
-
-This schema is sufficient to support all three research questions. It captures outcome-versus-process distinctions for RQ1, model identity for RQ2, and reference labels for automatic evaluation in RQ3.
-
-## Annotation workflow
-
-The annotation workflow should proceed in three phases.
-
-### Phase 1: discovery
-
-A small subset of traces from both tasks will be read and coded openly without a frozen taxonomy. The purpose is to discover candidate failure categories, recurrent ambiguities, and potential parent–child structure.
-
-### Phase 2: pilot
-
-A second subset will be annotated with the draft codebook. This phase tests whether the taxonomy is usable, whether boundaries between categories are clear, and whether the earliest-error rule can be applied consistently.
-
-### Phase 3: main annotation
-
-Once the taxonomy is frozen, the remaining corpus will be annotated under the final codebook. All changes during this phase should be logged carefully; category definitions should not be changed informally once confirmatory annotation begins.
-
-The supervisor’s role will be qualitative rather than fully independent second annotation. This means the supervisor should review the codebook, a sample of annotated traces, and the most ambiguous or low-confidence cases. This gives methodological support without expanding the project into a large formal reliability study.
-
-## Sample size and partitioning
-
-A balanced sample is important for both feasibility and interpretability. A suitable initial design is around 75 questions per dataset, answered by three models, giving approximately 450 traces in total.
-
-A practical partition is:
-
-| Partition | Questions per dataset | Approximate traces with 3 models | Purpose |
+# Project Plan (v2): A Unified Reasoning Failure Taxonomy for Small Language Models in QA
+
+> **Status:** revised draft for supervisor review. Items marked **[CONFIRM]** are open decisions (collected in the last section).
+
+## What changed from v1
+
+| Area | v1 | v2 | Why |
+|---|---|---|---|
+| Sampling | 75 random questions per dataset | Run all models on a larger **screening pool** (300 questions per dataset), then pick 75 **shared** questions per dataset, **stratified by how many models got each one wrong** | 3–4B models answer most GSM8K/CSQA questions correctly. A random 75 would give too few failures per model to build or compare categories |
+| Models | "About three SLMs" | Qwen2.5-3B-Instruct, Llama-3.2-3B-Instruct, Phi-4-mini-instruct | These are the same families ReTraceQA used, at matched size, which keeps the commonsense results comparable |
+| Splits | Unspecified | GSM8K **test** (1,319); CommonsenseQA **validation** (1,221) | CommonsenseQA test answers are not public |
+| Automated evaluation | Unspecified judge; PRM-7B | Free-tier API judge from a family **not** among the generators; PRM run on a free GPU notebook, with a smaller fallback PRM | The project has no budget for paid APIs or GPUs |
+| Calibration | None | Sanity-check the PRM and judge set-up on ProcessBench's GSM8K subset (human labels) before using them on our data | Separates "our pipeline is broken" from "the evaluator disagrees with us" |
+| Reliability | Supervisor qualitative review only | Plus a re-annotation of ~10% by the same annotator after a time gap, and an optional 30-trace supervisor double-label | Cheap evidence of label stability without a full multi-annotator study |
+| Reporting | Raw frequencies | Rates over the whole screening pool, failure-mode profiles within strata (reweighted where needed) | Stratified sampling deliberately over-represents failures, so raw frequencies would be biased |
+
+## 1. Objective and research questions
+
+Build and empirically test a hierarchical taxonomy of failures in the **observable** step-by-step reasoning traces of instruction-tuned SLMs, on math (GSM8K) and commonsense (CommonsenseQA) QA. The project makes no claims about hidden internal reasoning.
+
+- **RQ1 (primary):** Which failure modes are shared across math and commonsense reasoning, and which are task-specific?
+- **RQ2:** Do different SLMs show different failure profiles, or a common one across tasks?
+- **RQ3:** How well do automated evaluators (one general LLM judge and one math PRM) reproduce the human labels?
+
+The order is fixed, RQ1 → RQ2 → RQ3. RQ1 produces the codebook and the reference labels that RQ2 and RQ3 depend on.
+
+**Out of scope:** training a PRM or classifier, domains beyond the two datasets, a large panel of judges, a full multi-annotator reliability study.
+
+## 2. Grounding in prior work
+
+**ReTraceQA** (Molfese et al., ACL 2026) is the commonsense anchor.
+- Seven instruction-tuned SLMs (Llama 3.2/3.1, Qwen2.5, Phi-4-mini) generated zero-shot CoT traces on CSQA, OBQA, QASC and StrategyQA.
+- 2,421 traces were expert-annotated with the first error step and an error type: **Misinterpretation** (misreading the question or options), **Hallucination** (false or unverifiable world knowledge) or **Reasoning** (invalid inference).
+- 14–24% of correct answers came with flawed reasoning, and reasoning-aware scoring lowered SLM scores by up to 25 points.
+- *Taken over:* trace validity separate from answer correctness, first-error localisation, and the three error types as **seed parent categories** to test, not to adopt.
+
+**ProcessBench** (Zheng et al., ACL 2025) is the math anchor.
+- 3,400 solutions across GSM8K, MATH, OlympiadBench and Omni-MATH, each labelled with the **earliest erroneous step** (or "no error").
+- Process errors among correct-answer solutions are rare on GSM8K (≈3.5%) and common on harder sets. Errors cluster in early steps.
+- *Metric:* F1 = harmonic mean of accuracy on erroneous and on error-free solutions.
+- Qwen2.5-Math-PRM-7B is reported at ≈82 F1 on the GSM8K subset, which is competitive with GPT-4o used as a critic.
+- *Taken over:* the earliest-error definition, the F1 metric for RQ3, and the GSM8K subset as a calibration set.
+
+**What this means for v2:**
+1. Math traces with a correct answer but flawed reasoning will be rare. Most math failures will come from wrong-answer traces, which is another reason to stratify by outcome.
+2. Using ReTraceQA's model families makes our CSQA findings directly comparable to theirs.
+
+## 3. Datasets
+
+| Task | Dataset | Split used | Size | Answer check |
+|---|---|---|---|---|
+| Math | GSM8K | test | 1,319 | Last number after `Final answer:` compared numerically with the gold answer |
+| Commonsense | CommonsenseQA | validation | 1,221 (5 options) | Option letter after `Final answer:` compared with the gold letter |
+
+Caveats to state in the report:
+- With one dataset per task, "task-specific" means *specific to these datasets*.
+- Both benchmarks are public and may appear in the models' training data. This affects accuracy more than the structure of failures, but it should be acknowledged.
+
+## 4. Model selection
+
+| Role | Model | Size | Reason |
+|---|---|---|---|
+| Generator 1 | Qwen2.5-3B-Instruct | 3B | Used in ReTraceQA; strong for its size; reliable instruction following |
+| Generator 2 | Llama-3.2-3B-Instruct | 3B | Used in ReTraceQA; different family and training data |
+| Generator 3 | Phi-4-mini-instruct | 3.8B | Used in ReTraceQA; synthetic-data-heavy training gives a contrasting profile |
+| Reserve | Gemma-3-4B-it | 4B | Swap in only if a generator fails the format check |
+
+Selection criteria (from v1, unchanged): open weights, instruction-tuned, not math-specialised, roughly matched size (3–4B), runnable on a free GPU, and able to follow a numbered-step format.
+
+Models to exclude from the main comparison:
+- **Reasoning/"thinking" models** (for example R1-distills, or Qwen3 in thinking mode). Their very long traces make manual annotation impractical, and they are a different kind of system.
+- **Math-specialised generators.** They would mix up model specialisation with task domain.
+
+## 5. Trace generation protocol
+
+- **Prompt:** one zero-shot template per task, using each model's own chat template, asking for:
+  ```
+  Step 1: ...
+  Step 2: ...
+  ...
+  Final answer: <number | option letter>
+  ```
+  CommonsenseQA prompts list the options as `A. ... E.`. Both templates are versioned in the repo.
+- **Decoding:** greedy (temperature 0), max 512 new tokens, fixed library versions, fixed seed.
+- **Step segmentation:** split on `Step k:` markers, falling back to line breaks. **The same segmentation is used for human annotation, the judge and the PRM**, so step indices line up.
+- **Record per trace (JSONL):** `trace_id`, `task`, `dataset`, `item_id`, `question`, `options`, `gold`, `model_id`, `model_revision`, `prompt_version`, `decoding`, `raw_output`, `steps[]`, `pred`, `answer_correct`, `format_ok`, `timestamp`.
+- **Format failures** (no parsable final answer, or no steps) are counted and reported per model, kept out of the annotation sample, and not treated as reasoning failures.
+- **Dry run:** 10 questions per dataset per model. Every model must reach a format-ok rate of at least 90% before the full run. If one doesn't, fix the prompt once; if it still fails, use the reserve model.
+
+## 6. Sampling design (balanced sample)
+
+### 6.1 Screening pool
+- Draw a seeded random sample of **300 questions per dataset**.
+- Run all three models on them: 1,800 traces, about 1–2 GPU-hours per model on a free T4.
+- Score the answers automatically. **Accuracy and format rates in the report come from this pool**, so they reflect natural rates.
+
+### 6.2 Stratify by failure pattern
+For each question, let *k* = the number of models (0–3) that answered it wrong. Choose **75 shared questions per dataset** (all three models answer the same questions, which allows paired comparisons in RQ2):
+
+| Stratum | Meaning | Questions per dataset | Wrong-answer traces |
+|---|---|---:|---:|
+| k = 0 | All models correct | 20 | 0 |
+| k = 1 | One model wrong | 20 | 20 |
+| k = 2 | Two models wrong | 20 | 40 |
+| k = 3 | All models wrong | 15 | 45 |
+| **Total** | | **75** | **105 of 225 (≈47%)** |
+
+Rules:
+- Within k = 1 and k = 2, balance *which* model failed (for k = 1, about 7 questions where each model is the only one wrong). This stops one model from dominating the failure set.
+- If a stratum is too small, especially k = 3 on CSQA, take the shortfall from the nearest stratum and record the change.
+- Correct-answer traces are kept on purpose. They are where process errors (correct answer, flawed reasoning) are found, which is a key RQ1 finding.
+
+Result: **450 traces**, with about 70 wrong-answer and 80 correct-answer traces per model, split evenly across tasks.
+
+### 6.3 Partitions
+Each partition is drawn **proportionally from every stratum**:
+
+| Partition | Questions per dataset | Traces (×2 datasets ×3 models) | Purpose |
 |---|---:|---:|---|
-| Discovery subset | 10 | 60 | Open coding and category discovery |
-| Pilot subset | 10 | 60 | Codebook testing and revision |
-| Main analysis subset | 55 | 330 | Confirmatory annotation and analysis |
-| Total | 75 | 450 | Full corpus |
+| Discovery | 10 | 60 | Open coding |
+| Pilot | 10 | 60 | Test the codebook, then freeze it |
+| Main | 55 | 330 | Confirmatory annotation |
+| **Total** | **75** | **450** | |
 
-This structure supports iterative development without contaminating the final confirmatory analysis. If time permits, the discovery and pilot subsets can be re-annotated under the frozen taxonomy and included in a secondary full-corpus analysis.
+### 6.4 Reporting under stratified sampling
+- Report failure-mode distributions **conditioned on outcome** (wrong-answer vs correct-answer traces). These are not biased by the sampling.
+- For any population-level estimate (for example, the share of all correct answers that have flawed reasoning), **reweight each stratum** by its share of the screening pool, and say so.
 
-## RQ1 methodology
+## 7. Annotation
 
-RQ1 is the primary contribution of the project. Its purpose is to determine which failure modes are shared across mathematical and commonsense reasoning and which are task-specific within the selected QA settings.
+### 7.1 Principles
+1. Judge the observable trace, not the model's hidden reasoning.
+2. Trace validity is separate from answer correctness.
+3. Mark the **earliest** step that contains an error, following ProcessBench. A step that only restates the question or a premise is not an error. An unsupported but true claim is flagged by a codebook rule, decided during the pilot.
+4. Later errors caused by the first one are marked as propagated, not as new root failures.
+5. Categories come from the data. ReTraceQA's three types are hypotheses to test.
 
-The RQ1 analysis should proceed in three layers:
+### 7.2 Schema
+| Field | Values |
+|---|---|
+| `trace_id`, `task`, `dataset`, `item_id`, `model_id`, `stratum_k`, `partition` | Identifiers and design variables |
+| `answer_correct` | true / false (automatic) |
+| `trace_valid` | true / false |
+| `first_error_step` | integer, or -1 for no error |
+| `primary_failure_parent` | taxonomy parent label |
+| `primary_failure_child` | optional subtype |
+| `propagated_error` | true / false |
+| `secondary_failure` | optional independent second failure |
+| `confidence` | 1–3 |
+| `notes` | rationale for hard cases |
 
-1. **Descriptive layer:** frequency of valid traces, flawed traces, correct-answer/flawed-trace cases, and failure-category counts by task.
-2. **Comparative layer:** identify which categories appear in both tasks, which are strongly concentrated in one task, and which seem meaningful only in one domain.
-3. **Interpretive layer:** examine whether apparently different surface errors reflect the same underlying mechanism at a higher level of abstraction.
+### 7.3 Taxonomy development
+- **Discovery:** free-text descriptions of each failure → cluster into candidate categories → merge superficial splits and split categories that mix different mechanisms.
+- Write an **inclusion rule, exclusion rule and examples** for each category.
+- **Pilot:** apply the codebook, log every hard decision, revise, then **freeze it as v1.0** and record the freeze in git.
+- Keep **4–6 parent categories** that are task-neutral, with task-specific children. Sketch only:
+  - *Problem misreading* (grounding)
+  - *Unsupported or false premise* (content; includes hallucinated facts or numbers)
+  - *Invalid inference / transformation* (children: arithmetic or algebraic slip, causal leap, ...)
+  - *Constraint or information omission*
+  - *Answer–reasoning inconsistency*
+- Rare categories are merged at the parent level for the quantitative analysis.
 
-The key output of RQ1 is not merely a list of categories. It is a structured map showing which failures are likely task-general and which are genuinely task-linked. That map becomes the conceptual basis for the rest of the project.
+### 7.4 Workflow and reliability
+- One researcher annotates in a spreadsheet or CSV, with the trace shown step by step and the model hidden where practical, to reduce bias in RQ2.
+- **Self-consistency:** re-annotate a random ~10% of main traces at least 2 weeks later, and report Cohen's κ for validity and parent label, and agreement on the first-error step.
+- **Supervisor:** reviews the codebook, all confidence-1 cases, and a sample of traces. *Optional:* double-labels 30 traces, which gives a cheap inter-annotator κ. **[CONFIRM]**
+- **Time estimate:** about 4–6 min per trace, so 450 traces ≈ 30–45 hours of annotation.
 
-## RQ2 methodology
+## 8. Analysis
 
-RQ2 asks whether different SLMs fail in different ways or share a common failure profile across tasks. Once the taxonomy and annotations from RQ1 exist, each model can be represented by the distribution of failure categories across the selected tasks.
+### RQ1
+1. **Descriptive:** valid-trace rate, correct-answer-with-flawed-reasoning rate, and parent and child category counts by task, conditioned on outcome.
+2. **Comparative:** categories in both tasks, mostly in one task, or only in one. Test the task × parent contingency table with χ² or Fisher's exact test, with bootstrap 95% CIs (resampling questions).
+3. **Interpretive:** representative examples showing one mechanism appearing differently in each task, for example a lost constraint in math vs a lost fact in CSQA.
 
-The main RQ2 analyses should include:
+### RQ2
+- Each model's failure profile is its distribution over parent categories, per task.
+- **Profile similarity:** Jensen–Shannon distance between models, with bootstrap CIs.
+- **Model × task interaction:** whether a model's profile on math differs from its profile on CSQA.
+- **Paired view:** on shared k = 1 and k = 2 questions, check whether models fail the same question *for the same reason*.
 
-- Category frequency by model and task.
-- Relative ranking of the most common failure categories per model.
-- Similarity of model failure profiles at the parent-category level.
-- Identification of model–task interactions, where a model behaves differently on math than on commonsense.
-
-This question is secondary because it depends entirely on the successful completion of RQ1. Its value is diagnostic: it shows whether the taxonomy reveals stable model-specific patterns or whether failures are largely shared across small models regardless of family.
-
-## RQ3 methodology
-
-RQ3 evaluates how well automated systems can reproduce the proposed failure labels relative to the human annotation framework. This stage should remain intentionally limited so that it strengthens the project rather than overwhelming it.
-
-### General LLM judge
-
-One strong general LLM judge will be applied to both tasks. It will receive the question, the model-generated trace, the correct answer, and the frozen taxonomy definitions, and it will be asked to produce structured outputs for:
-
-- Trace validity.
-- First erroneous step if any.
-- Failure-category label.
-
-This evaluator is suitable for both mathematical and commonsense traces because it is not domain-restricted.
-
-### Math-specific PRM
-
-For the mathematical dataset, one specialized PRM will also be used. A practical candidate is Qwen2.5-Math-PRM-7B, which is designed to score the quality of intermediate mathematical reasoning steps.
-
-The PRM should be used only for tasks it naturally supports:
-
-- Detecting whether a mathematical trace is flawed.
-- Identifying the first likely erroneous step.
-
-It should not be expected to perform the full taxonomy classification unless the model is explicitly extended or wrapped for that purpose. Therefore, the human-versus-automation comparison for math will be asymmetric: the PRM supports detection and localization, while the general LLM judge supports detection, localization, and category classification.
-
-### Why no new trained classifier
-
-Training a new classifier or PRM is outside the primary project scope because this study is focused on taxonomy creation and empirical failure analysis rather than model training. Using existing evaluators is therefore the most realistic design choice for a 3–4 month project.
-
-## Metrics and analysis strategy
-
-The analysis should mix descriptive statistics with targeted qualitative examples. The project is not only counting failures; it is also trying to understand how failure categories behave across tasks and models.
-
-Suggested outputs include:
-
-- Final-answer accuracy by model and task.
-- Valid-trace rate by model and task.
-- Rate of process errors with correct final answers.
-- Frequency of each parent and child failure category by task and by model.
-- Distribution of first-error positions within traces.
-- Agreement between automatic evaluators and human labels for trace validity, first-error localization, and category assignment.
-
-Because the sample size is moderate, the most realistic inferential analysis is based on contingency tables, confidence intervals, and careful qualitative interpretation rather than overly complex modeling. Statistical testing can be included selectively, but the main emphasis should remain on interpretable distributions and representative annotated cases.
-
-## Expected deliverables
-
-The project should produce the following deliverables:
-
-1. A formal research protocol.
-2. A reproducible generation pipeline for SLM reasoning traces.
-3. A hierarchical taxonomy of reasoning failure modes.
-4. A written annotation codebook with definitions and examples.
-5. A manually annotated trace corpus covering two QA tasks.
-6. An RQ1 analysis of shared versus task-specific failures.
-7. An RQ2 analysis of cross-model failure profiles.
-8. An RQ3 analysis comparing human labels with an LLM judge and a math PRM.
-9. A final written report suitable for supervisor review and future thesis continuation.
-
-These deliverables are well aligned with the longer-term thesis direction because they create reusable data, methodology, and conceptual structure rather than a one-off benchmark result.
-
-## Risks and mitigation
-
-Several risks should be anticipated early.
-
-| Risk | Why it matters | Mitigation |
+### RQ3
+| Evaluator | Tasks | Outputs compared to human labels |
 |---|---|---|
-| Taxonomy becomes too detailed | Categories become hard to apply consistently | Keep a small parent layer and only a few useful child categories |
-| Annotation takes too long | The project may not reach RQ3 | Limit the corpus size and freeze the taxonomy early |
-| Models produce inconsistent formats | Step parsing and annotation become harder | Use a strict response template with numbered steps |
-| Rare categories appear too infrequently | Quantitative comparison becomes unstable | Merge sparse categories at the parent level for main analysis |
-| PRM does not align with human categories | RQ3 results become hard to interpret | Evaluate PRM mainly on detection and localization, not full classification |
-| Supervisor review is limited | Reliability evidence remains weak | Keep detailed annotation notes and perform spot-check review on ambiguous cases |
+| LLM judge | Math + CSQA | Validity, first-error step, parent category |
+| Math PRM | Math only | Validity, first-error step |
 
-These mitigation choices preserve the main contribution even if some secondary analyses become narrower than planned.
+- **Validity and localisation:** ProcessBench-style F1 (harmonic mean of accuracy on erroneous and on error-free traces), plus exact match of the first-error step on erroneous traces.
+- **Category:** Cohen's κ, macro-F1 and a confusion matrix at the parent level.
+- **PRM decision rule:** the first step whose score falls below 0.5 is the first error. The threshold is fixed beforehand or tuned on ProcessBench GSM8K, **never on our data**.
+- **Bias check:** compare evaluator agreement separately for each generator. The PRM is Qwen-based and one generator is Qwen.
 
-## Timeline
+## 9. Automated evaluation set-up (free tools)
 
-A 9-week execution timeline fits the project well.
+**LLM judge:** one free-tier API model from a family **not** among the generators (not Qwen, Llama or Phi), so the judge isn't rating its own family. As of Oct 2026, candidates are:
+- **Google Gemini API free tier** (Flash models). Limits are listed in AI Studio.
+- **Groq free tier: `gpt-oss-120b`** (about 30 requests/min, 1,000/day, OpenAI-compatible API).
+- **OpenRouter `:free` models** (50 requests/day without credit). Use only as a fallback.
 
-| Week | Main activity | Output |
+The workload is small: about 450 judge calls, plus about 400 calibration calls. Either of the first two fits inside a few days of free quota.
+
+Rules for using the judge:
+- Temperature 0, JSON output, the frozen codebook in the prompt, and the gold answer given (reference-based, as in v1).
+- Log the exact model ID and date, and store every raw response.
+- **Run all judge calls within a short window.** Free-tier models get retired without notice; Groq retired its Llama 3.3 70B in Aug 2026.
+- *Optional:* run a second free judge as a robustness check, if quota allows.
+
+**PRM:**
+- Run Qwen2.5-Math-PRM-7B on a free GPU notebook (Kaggle or Colab). In fp16 the 7B model needs about 15–16 GB, which is tight on a single T4.
+- **Fallback:** a smaller PRM (for example Skywork's 1.5B PRM), reported as such.
+- Avoid 4-bit quantisation if possible, because it changes the scores. If it is used, report it.
+
+**Calibration step:** before running on our traces, run both evaluators on the **ProcessBench GSM8K subset** and check that the PRM roughly reproduces the published F1. If it doesn't, the pipeline has a bug.
+
+## 10. Deliverables
+1. Protocol (this document), with a frozen version tagged in git.
+2. Reproducible generation pipeline, configs and prompts.
+3. Screening pool and annotated corpus (JSONL and CSV).
+4. Hierarchical taxonomy and codebook v1.0, with examples and a change log.
+5. RQ1, RQ2 and RQ3 analyses as notebooks.
+6. Final report.
+
+## 11. Risks and mitigation
+| Risk | Mitigation |
+|---|---|
+| Too few failures per cell | Outcome-stratified sampling (§6) |
+| Too few correct-answer/flawed-reasoning cases in math (≈3.5% in ProcessBench) | Report as a finding with CIs; don't build categories on these few cases alone |
+| Format non-compliance | Dry-run gate, reserve model, format failures reported separately |
+| Taxonomy too fine | 4–6 parent categories; merge rare children at the parent level |
+| Annotation overruns | Freeze the codebook by week 5; cut RQ3 depth before cutting RQ1 |
+| Free API changes or retirement | Run the judge in one window; log model IDs; keep a second provider ready |
+| PRM doesn't fit the free GPU | Smaller fallback PRM; Kaggle instead of Colab |
+| Single annotator | Self-re-annotation κ, supervisor review, optional 30-trace double-label |
+
+## 12. Timeline (9 weeks)
+| Week | Activity | Output |
 |---|---|---|
-| 1 | Finalize scope, datasets, model list, prompt template | Protocol draft |
-| 2 | Implement trace-generation and parsing pipeline | Working generation setup |
-| 3 | Generate dry-run traces and discovery subset | Early examples and candidate categories |
-| 4 | Develop draft taxonomy and codebook | Taxonomy v0 and codebook draft |
-| 5 | Pilot annotation and supervisor review | Revised taxonomy and frozen codebook |
-| 6 | Generate or finalize the full corpus | Complete dataset for main annotation |
-| 7 | Main annotation and audit | Annotated corpus |
-| 8 | RQ1 and RQ2 analysis | Comparative results |
-| 9 | RQ3 automated evaluation and report writing | Final project report |
+| 1 | Confirm open decisions; HF access to the models; prompt templates; dry run | Protocol v2 signed off; format check passed |
+| 2 | Build the pipeline; generate the screening pool (1,800 traces); score answers | Screening pool and accuracy table |
+| 3 | Stratified selection; discovery coding (60 traces) | Candidate categories |
+| 4 | Draft taxonomy and codebook | Codebook v0 |
+| 5 | Pilot (60 traces); supervisor review; **freeze** | Codebook v1.0 |
+| 6–7 | Main annotation (330); self-re-annotation sample | Annotated corpus |
+| 8 | RQ1 and RQ2 analysis; set up judge and PRM; ProcessBench calibration | Results |
+| 9 | RQ3 runs and analysis; write report | Final report |
 
-If annotation takes longer than expected, the best fallback is to preserve RQ1 and RQ2 at full quality and reduce the depth of RQ3 rather than weakening the taxonomy stage. This keeps the central scientific contribution intact.
-
-## Final project framing
-
-The final framing of the project is as follows. The study will construct a unified taxonomy of reasoning failures in SLM-generated QA traces across mathematics and commonsense reasoning, apply that taxonomy to a balanced corpus generated by multiple SLMs, and use the resulting annotations to compare cross-task and cross-model failure profiles. It will then perform a limited automated-evaluation study using a general LLM judge across both tasks and a specialized PRM for mathematics.
-
-This design is ambitious enough to be research-worthy but controlled enough to be feasible in a short academic project. It also creates a strong bridge to future thesis work, where the taxonomy, corpus, and evaluation framework can later be expanded to more datasets, more domains, stronger annotation validation, and richer automated classifiers.
+## 13. Open decisions **[CONFIRM]**
+1. **Supervisor sign-off on stratified sampling.** It changes which claims are allowed: natural rates come from the screening pool, failure profiles from the stratified sample.
+2. **Compute:** a local GPU, or free Kaggle/Colab only?
+3. **Hugging Face account with gated access to Llama-3.2-3B-Instruct.** Request it now, because approval can take time.
+4. **Free API account** (Gemini and/or Groq), and whether your institution has rules about sending data to external APIs. The datasets are public, so this is usually fine.
+5. **Supervisor time:** review only, or also the 30-trace double-label?
+6. **Annotation time budget:** about 30–45 hours. Is that realistic alongside other work?
+7. **Comparability with ReTraceQA:** should the final parent categories also map onto Misinterpretation / Hallucination / Reasoning?
+8. **Start date and hard deadline,** and the report format expected (lab report vs thesis chapter).
 
 ## References
-
-1. Francesco Maria Molfese, Luca Moroni, Ciro Porcaro, Simone Conia, and Roberto Navigli. 2026. *ReTraceQA: Evaluating Reasoning Traces of Small Language Models in Commonsense Question Answering*. In *Proceedings of the 64th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)*. Association for Computational Linguistics. Available at: [ACL Anthology](https://aclanthology.org/2026.acl-long.1798/).
-
-2. Chujie Zheng, Zhenru Zhang, Beichen Zhang, Runji Lin, Keming Lu, Bowen Yu, Dayiheng Liu, Jingren Zhou, and Junyang Lin. 2025. *ProcessBench: Identifying Process Errors in Mathematical Reasoning*. In *Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)*. Association for Computational Linguistics. Available at: [ACL Anthology](https://aclanthology.org/2025.acl-long.50/).
-
-3. Qwen Team. 2024. *Qwen2.5-Math-PRM-7B*. Model card. Available at: [Hugging Face](https://huggingface.co/Qwen/Qwen2.5-Math-PRM-7B).
-
-4. Qwen Team. 2025. *Towards Effective Process Supervision in Mathematical Reasoning*. Available at: [Qwen Blog](https://qwenlm.github.io/blog/qwen2.5-math-prm/).
-
-5. QwenLM. 2024. *ProcessBench official repository*. Available at: [GitHub](https://github.com/QwenLM/ProcessBench).
-
-6. QwenLM. 2024. *Qwen2.5-MATH repository*. Available at: [GitHub](https://github.com/QwenLM/Qwen2.5-MATH).
-
-7. OpenReview PDF version of *ReTraceQA*. Available at: [OpenReview PDF](https://openreview.net/pdf?id=kqArTgW53f).
-
-8. *The Lessons of Developing Process Reward Models in Mathematical Reasoning*. 2025. Available at: [arXiv PDF](https://arxiv.org/pdf/2501.07301.pdf).
+1. Molfese, F. M., Moroni, L., Porcaro, C., Conia, S., & Navigli, R. (2026). *ReTraceQA: Evaluating Reasoning Traces of Small Language Models in Commonsense Question Answering.* ACL 2026. https://aclanthology.org/2026.acl-long.1798/ (preprint: arXiv:2510.09351)
+2. Zheng, C., Zhang, Z., Zhang, B., Lin, R., Lu, K., Yu, B., Liu, D., Zhou, J., & Lin, J. (2025). *ProcessBench: Identifying Process Errors in Mathematical Reasoning.* ACL 2025. https://aclanthology.org/2025.acl-long.50/ (code: https://github.com/QwenLM/ProcessBench)
+3. Zhang, Z., et al. (2025). *The Lessons of Developing Process Reward Models in Mathematical Reasoning.* arXiv:2501.07301.
+4. Qwen Team (2025). *Qwen2.5-Math-PRM-7B* model card. https://huggingface.co/Qwen/Qwen2.5-Math-PRM-7B
+5. Cobbe, K., et al. (2021). *Training Verifiers to Solve Math Word Problems* (GSM8K). arXiv:2110.14168.
+6. Talmor, A., Herzig, J., Lourie, N., & Berant, J. (2019). *CommonsenseQA: A Question Answering Challenge Targeting Commonsense Knowledge.* NAACL 2019.
