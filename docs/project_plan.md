@@ -74,14 +74,29 @@ Models to exclude from the main comparison:
 
 ## 5. Trace generation protocol
 
-- **Prompt:** one zero-shot template per task, using each model's own chat template, asking for:
+- **Prompt:** one zero-shot chain-of-thought template per task, identical for all three models and sent through each model's own chat template.
+
+  Math (GSM8K):
   ```
-  Step 1: ...
-  Step 2: ...
-  ...
-  Final answer: <number | option letter>
+  Solve the following math problem. Reason step by step.
+  Write each step on its own line, numbered as "Step 1:", "Step 2:", and so on.
+  After the last step, write the final answer on its own line in exactly this format:
+  Final answer: <number>
+
+  Problem: {question}
   ```
-  CommonsenseQA prompts list the options as `A. ... E.`. Both templates are versioned in the repo.
+  Commonsense (CommonsenseQA): the same wording, with `Question: {question}` followed by the options `A. … E.`, and `Final answer: <letter>`.
+
+- **Why this prompt** (relation to prior work):
+
+  | Choice | Reason |
+  |---|---|
+  | Zero-shot (no worked examples) | Matches ReTraceQA's zero-shot chain-of-thought set-up, so the commonsense results stay comparable. Example solutions would make models copy their style and change their natural failures |
+  | Numbered `Step k:` lines | Each step needs a clear index for "first wrong step", and the PRM needs separated steps. ProcessBench split free-form solutions into steps afterwards; asking for numbered steps directly is more reliable for manual annotation |
+  | Fixed `Final answer:` line | Makes the automatic answer check reliable |
+  | Same prompt for every model | Fair comparison for RQ2 |
+
+  *Risk:* a forced format can slightly change how a model reasons, and small models may ignore it. The dry run checks this. If ReTraceQA's exact prompt wording (paper appendix) is available, align the wording with it.
 - **Decoding:** greedy (temperature 0), max 512 new tokens, fixed library versions, fixed seed.
 - **Step segmentation:** split on `Step k:` markers, falling back to line breaks. **The same segmentation is used for human annotation, the judge and the PRM**, so step indices line up.
 - **Record per trace (JSONL):** `trace_id`, `task`, `dataset`, `item_id`, `question`, `options`, `gold`, `model_id`, `model_revision`, `prompt_version`, `decoding`, `raw_output`, `steps[]`, `pred`, `answer_correct`, `format_ok`, `timestamp`.
@@ -158,14 +173,31 @@ After the freeze, the pilot traces are re-labelled under the final taxonomy. Thi
 
 | Stage | Who | Traces | What happens | Output |
 |---|---|---:|---|---|
-| **A. Informal read** | Researcher | ~30 (not in the 360) | Read about 15 wrong-answer screening-pool traces per task. Write one plain-language note per failure, using ReTraceQA's and ProcessBench's error types as starting hypotheses | Proposed taxonomy v0 and codebook draft (definition, include/exclude rule and example per category) |
+| **A. Informal read** | Researcher | ~30 (not in the 360) | Read about 15 wrong-answer screening-pool traces per task and fill in the short note format below. Then group similar descriptions into categories and compare them with ReTraceQA's and ProcessBench's error types | Proposed taxonomy v0: a name, a one-line definition and one example per category |
 | **B. Pilot annotation** | Researcher | 60 | Fully annotate the pilot partition with v0. Log every case the codebook doesn't settle | Pilot labels and a list of hard cases |
 | **C. Supervisor review** | Supervisor | 60 reviewed; *optionally* 24 blind | Reads the codebook, all confidence-1 cases and the hard-case list. *Optional:* independently labels 24 pilot traces (2 per model × task × correct/wrong) without seeing yours, about 2 hours of supervisor time | Comments, plus agreement figures if the blind labels are done |
 | **D. Revise and freeze** | Both | n/a | Discuss disagreements, then merge, split or redefine categories. Freeze as **v1.0** and tag it in git. After this, definitions change only through a logged decision | Final taxonomy and codebook v1.0 |
 | **E. Main annotation** | Researcher | 300 + 60 re-label | Annotate the main partition with v1.0, about 150 per week. Re-label the 60 pilot traces under v1.0 | Final corpus of 360 |
 | **F. Self-check** | Researcher | 30 | Re-annotate 30 random main traces at least 2 weeks after first labelling them, without looking at the old labels | Self-agreement figures (Cohen's κ) |
 
-**Parent categories:** keep **4–6**, task-neutral, with task-specific children. The v0 sketch below is to be tested in stage A, not adopted:
+**Stage A note format** (deliberately simple; the full label set in §7.2 starts with the pilot):
+
+| Field | What to write |
+|---|---|
+| `trace_id` | The trace being read |
+| `reasoning_valid` | yes / no |
+| `first_error_step` | Number of the first wrong step |
+| `description` | One sentence in your own words, e.g. "added instead of multiplied", "invented a number not in the problem", "claimed penguins can fly" |
+| `confidence` | 1 = unsure, 2 = fairly sure, 3 = clear |
+| `note` | Optional: an independent later error, or anything odd |
+
+Only the **first** error is described, because later mistakes usually just follow from it; this matches ProcessBench and ReTraceQA, and it is what the RQ3 evaluators are tested on. An independent later error gets a short note only.
+
+Wrong-answer traces are used for stage A because each one is guaranteed to contain a failure. Correct-answer traces, where hidden errors may be found, are included from the pilot onwards.
+
+To avoid steering the descriptions, write them **before** looking at the category sketch below; use the sketch only afterwards, as a comparison.
+
+**Parent categories:** keep **4–6**, task-neutral, with task-specific children. The v0 sketch below is a comparison point after stage A, not something to adopt:
 - *Problem misreading* (grounding)
 - *Unsupported or false premise* (content; includes hallucinated facts or numbers)
 - *Invalid inference / transformation* (children: arithmetic or algebraic slip, causal leap, ...)
