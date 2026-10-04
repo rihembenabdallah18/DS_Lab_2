@@ -6,12 +6,13 @@
 
 | Area | v1 | v2 | Why |
 |---|---|---|---|
-| Sampling | 75 random questions per dataset | Run all models on a larger **screening pool** (300 questions per dataset), then pick 75 **shared** questions per dataset, **stratified by how many models got each one wrong** | 3–4B models answer most GSM8K/CSQA questions correctly. A random 75 would give too few failures per model to build or compare categories |
+| Sampling | 75 random questions per dataset (450 traces) | Run all models on a larger **screening pool** (300 questions per dataset), then pick 60 **shared** questions per dataset, **stratified by how many models got each one wrong**: **360 traces** to annotate | 3–4B models answer most GSM8K/CSQA questions correctly, so a random sample would give too few failures. 360 keeps one person's annotation work at about 32 hours (§7.5) |
+| Annotation workflow | Discovery → pilot → main | Draft taxonomy from an informal read → **pilot of 60 traces** → supervisor review (optionally blind-labels 24) → **freeze** → annotate the remaining 300 | Matches the researcher-then-supervisor workflow |
 | Models | "About three SLMs" | Qwen2.5-3B-Instruct, Llama-3.2-3B-Instruct, Phi-4-mini-instruct | These are the same families ReTraceQA used, at matched size, which keeps the commonsense results comparable |
 | Splits | Unspecified | GSM8K **test** (1,319); CommonsenseQA **validation** (1,221) | CommonsenseQA test answers are not public |
-| Automated evaluation | Unspecified judge; PRM-7B | Free-tier API judge from a family **not** among the generators; PRM run on a free GPU notebook, with a smaller fallback PRM | The project has no budget for paid APIs or GPUs |
+| Compute and automated evaluation | Unspecified | All GPU work on **Kaggle** (free 2×T4). Free-tier API judge from a family **not** among the generators | The project has no budget for paid APIs or GPUs |
 | Calibration | None | Sanity-check the PRM and judge set-up on ProcessBench's GSM8K subset (human labels) before using them on our data | Separates "our pipeline is broken" from "the evaluator disagrees with us" |
-| Reliability | Supervisor qualitative review only | Plus a re-annotation of ~10% by the same annotator after a time gap, and an optional 30-trace supervisor double-label | Cheap evidence of label stability without a full multi-annotator study |
+| Reliability | Supervisor qualitative review only | Plus an optional 24-trace blind supervisor label during the pilot, and a 30-trace self-re-annotation | Cheap evidence of label stability without a full multi-annotator study |
 | Reporting | Raw frequencies | Rates over the whole screening pool, failure-mode profiles within strata (reweighted where needed) | Stratified sampling deliberately over-represents failures, so raw frequencies would be biased |
 
 ## 1. Objective and research questions
@@ -65,7 +66,7 @@ Caveats to state in the report:
 | Generator 3 | Phi-4-mini-instruct | 3.8B | Used in ReTraceQA; synthetic-data-heavy training gives a contrasting profile |
 | Reserve | Gemma-3-4B-it | 4B | Swap in only if a generator fails the format check |
 
-Selection criteria (from v1, unchanged): open weights, instruction-tuned, not math-specialised, roughly matched size (3–4B), runnable on a free GPU, and able to follow a numbered-step format.
+Selection criteria (from v1, unchanged): open weights, instruction-tuned, not math-specialised, roughly matched size (3–4B), runnable on a free Kaggle GPU, and able to follow a numbered-step format.
 
 Models to exclude from the main comparison:
 - **Reasoning/"thinking" models** (for example R1-distills, or Qwen3 in thinking mode). Their very long traces make manual annotation impractical, and they are a different kind of system.
@@ -91,36 +92,40 @@ Models to exclude from the main comparison:
 
 ### 6.1 Screening pool
 - Draw a seeded random sample of **300 questions per dataset**.
-- Run all three models on them: 1,800 traces, about 1–2 GPU-hours per model on a free T4.
+- Run all three models on them: 1,800 traces, about 1–2 GPU-hours per model on Kaggle.
+- **These traces are not annotated**, only scored automatically.
 - Score the answers automatically. **Accuracy and format rates in the report come from this pool**, so they reflect natural rates.
 
 ### 6.2 Stratify by failure pattern
-For each question, let *k* = the number of models (0–3) that answered it wrong. Choose **75 shared questions per dataset** (all three models answer the same questions, which allows paired comparisons in RQ2):
+For each question, let *k* = the number of models (0–3) that answered it wrong. Choose **60 shared questions per dataset** (all three models answer the same questions, which allows paired comparisons in RQ2):
 
 | Stratum | Meaning | Questions per dataset | Wrong-answer traces |
 |---|---|---:|---:|
-| k = 0 | All models correct | 20 | 0 |
-| k = 1 | One model wrong | 20 | 20 |
-| k = 2 | Two models wrong | 20 | 40 |
-| k = 3 | All models wrong | 15 | 45 |
-| **Total** | | **75** | **105 of 225 (≈47%)** |
+| k = 0 | All models correct | 16 | 0 |
+| k = 1 | One model wrong | 16 | 16 |
+| k = 2 | Two models wrong | 16 | 32 |
+| k = 3 | All models wrong | 12 | 36 |
+| **Total** | | **60** | **84 of 180 (≈47%)** |
 
 Rules:
-- Within k = 1 and k = 2, balance *which* model failed (for k = 1, about 7 questions where each model is the only one wrong). This stops one model from dominating the failure set.
+- Within k = 1 and k = 2, balance *which* model failed (for k = 1, about 5 questions where each model is the only one wrong). This stops one model from dominating the failure set.
 - If a stratum is too small, especially k = 3 on CSQA, take the shortfall from the nearest stratum and record the change.
 - Correct-answer traces are kept on purpose. They are where process errors (correct answer, flawed reasoning) are found, which is a key RQ1 finding.
 
-Result: **450 traces**, with about 70 wrong-answer and 80 correct-answer traces per model, split evenly across tasks.
+Result: **360 traces** (180 per task). Each model has about 28 wrong-answer and 32 correct-answer traces per task, which is enough to compare parent-level categories.
 
 ### 6.3 Partitions
 Each partition is drawn **proportionally from every stratum**:
 
 | Partition | Questions per dataset | Traces (×2 datasets ×3 models) | Purpose |
 |---|---:|---:|---|
-| Discovery | 10 | 60 | Open coding |
-| Pilot | 10 | 60 | Test the codebook, then freeze it |
-| Main | 55 | 330 | Confirmatory annotation |
-| **Total** | **75** | **450** | |
+| Pilot | 10 (3 / 3 / 2 / 2 across k = 0–3) | 60 | First annotation with the proposed taxonomy; supervisor review |
+| Main | 50 | 300 | Annotated with the frozen taxonomy |
+| **Total** | **60** | **360** | |
+
+Taxonomy discovery uses **extra screening-pool traces that are not in the 360** (see §7.3), so no annotation-sample traces are used up.
+
+After the freeze, the pilot traces are re-labelled under the final taxonomy. This is quick because they've already been read, and it brings them into the final corpus, giving 360 for RQ1–RQ3. A sensitivity check reports the main results on the 300 main traces alone.
 
 ### 6.4 Reporting under stratified sampling
 - Report failure-mode distributions **conditioned on outcome** (wrong-answer vs correct-answer traces). These are not biased by the sampling.
@@ -149,23 +154,60 @@ Each partition is drawn **proportionally from every stratum**:
 | `confidence` | 1–3 |
 | `notes` | rationale for hard cases |
 
-### 7.3 Taxonomy development
-- **Discovery:** free-text descriptions of each failure → cluster into candidate categories → merge superficial splits and split categories that mix different mechanisms.
-- Write an **inclusion rule, exclusion rule and examples** for each category.
-- **Pilot:** apply the codebook, log every hard decision, revise, then **freeze it as v1.0** and record the freeze in git.
-- Keep **4–6 parent categories** that are task-neutral, with task-specific children. Sketch only:
-  - *Problem misreading* (grounding)
-  - *Unsupported or false premise* (content; includes hallucinated facts or numbers)
-  - *Invalid inference / transformation* (children: arithmetic or algebraic slip, causal leap, ...)
-  - *Constraint or information omission*
-  - *Answer–reasoning inconsistency*
-- Rare categories are merged at the parent level for the quantitative analysis.
+### 7.3 Workflow: from proposed taxonomy to full corpus
 
-### 7.4 Workflow and reliability
-- One researcher annotates in a spreadsheet or CSV, with the trace shown step by step and the model hidden where practical, to reduce bias in RQ2.
-- **Self-consistency:** re-annotate a random ~10% of main traces at least 2 weeks later, and report Cohen's κ for validity and parent label, and agreement on the first-error step.
-- **Supervisor:** reviews the codebook, all confidence-1 cases, and a sample of traces. *Optional:* double-labels 30 traces, which gives a cheap inter-annotator κ. **[CONFIRM]**
-- **Time estimate:** about 4–6 min per trace, so 450 traces ≈ 30–45 hours of annotation.
+| Stage | Who | Traces | What happens | Output |
+|---|---|---:|---|---|
+| **A. Informal read** | Researcher | ~30 (not in the 360) | Read about 15 wrong-answer screening-pool traces per task. Write one plain-language note per failure, using ReTraceQA's and ProcessBench's error types as starting hypotheses | Proposed taxonomy v0 and codebook draft (definition, include/exclude rule and example per category) |
+| **B. Pilot annotation** | Researcher | 60 | Fully annotate the pilot partition with v0. Log every case the codebook doesn't settle | Pilot labels and a list of hard cases |
+| **C. Supervisor review** | Supervisor | 60 reviewed; *optionally* 24 blind | Reads the codebook, all confidence-1 cases and the hard-case list. *Optional:* independently labels 24 pilot traces (2 per model × task × correct/wrong) without seeing yours, about 2 hours of supervisor time | Comments, plus agreement figures if the blind labels are done |
+| **D. Revise and freeze** | Both | n/a | Discuss disagreements, then merge, split or redefine categories. Freeze as **v1.0** and tag it in git. After this, definitions change only through a logged decision | Final taxonomy and codebook v1.0 |
+| **E. Main annotation** | Researcher | 300 + 60 re-label | Annotate the main partition with v1.0, about 150 per week. Re-label the 60 pilot traces under v1.0 | Final corpus of 360 |
+| **F. Self-check** | Researcher | 30 | Re-annotate 30 random main traces at least 2 weeks after first labelling them, without looking at the old labels | Self-agreement figures (Cohen's κ) |
+
+**Parent categories:** keep **4–6**, task-neutral, with task-specific children. The v0 sketch below is to be tested in stage A, not adopted:
+- *Problem misreading* (grounding)
+- *Unsupported or false premise* (content; includes hallucinated facts or numbers)
+- *Invalid inference / transformation* (children: arithmetic or algebraic slip, causal leap, ...)
+- *Constraint or information omission*
+- *Answer–reasoning inconsistency*
+
+Rare children are merged into their parent category for the quantitative analysis.
+
+While waiting for the supervisor in stage C, the researcher can prepare the RQ3 calibration on ProcessBench (§9), which doesn't depend on the taxonomy.
+
+### 7.4 Annotating one trace
+
+Each trace is one spreadsheet row, with its steps numbered. Drop-down lists hold the category labels, and the model name is hidden. The procedure:
+
+1. Read the question and gold answer (and the options for CSQA). The `answer_correct` field is already filled in automatically.
+2. Go through the steps in order. For each step ask: *is this true, and does it follow from the question and earlier steps?*
+3. The first step that fails is `first_error_step`. If none fails, enter `-1`, set `trace_valid = true` and stop. **A correct, valid trace takes 1–3 minutes.**
+4. Give the first error a parent category (and a child if one fits).
+5. Mark `propagated_error = true` if later steps go wrong *because of* that first error.
+6. If a later, *unrelated* error appears, record it in `secondary_failure`.
+7. Set `confidence` (1 = unsure, 3 = clear) and write a short note if confidence is 1.
+
+**Worked example (GSM8K, made up):**
+> Q: *A shop sells pens at $3 each. Tom buys 4 pens and pays with a $20 bill. How much change does he get?* Gold: 8
+> Step 1: Each pen costs $3. · Step 2: Tom buys 4 pens, so 3 + 4 = 7. · Step 3: 20 − 7 = 13. · Final answer: 13
+
+→ `answer_correct=false`, `trace_valid=false`, `first_error_step=2`, parent = *Invalid inference / transformation*, child = *wrong operation*, `propagated_error=true` (step 3 is right given step 2), `secondary_failure=none`, `confidence=3`.
+
+### 7.5 Workload
+| Stage | Traces | Minutes per trace | Hours |
+|---|---:|---:|---:|
+| A. Informal read | ~30 | ~3 (notes only) | ~1.5 |
+| B. Pilot (slower: codebook is new) | 60 | ~7 | ~7 |
+| E. Main: correct-answer traces | ~160 | ~2.5 | ~7 |
+| E. Main: wrong-answer traces | ~140 | ~5.5 | ~13 |
+| E. Pilot re-label | 60 | ~2 | ~2 |
+| F. Self-check | 30 | ~4 | ~2 |
+| **Total (researcher)** | | | **≈ 32 h over ~5 weeks** |
+
+The supervisor needs about 2–3 hours for review, plus about 2 hours if they do the optional blind labels.
+
+If time runs short, cut the main partition to 40 questions per dataset (240 main traces, 300 in total) rather than shortening the pilot. Do this before sampling, not halfway through.
 
 ## 8. Analysis
 
@@ -191,14 +233,33 @@ Each partition is drawn **proportionally from every stratum**:
 - **PRM decision rule:** the first step whose score falls below 0.5 is the first error. The threshold is fixed beforehand or tuned on ProcessBench GSM8K, **never on our data**.
 - **Bias check:** compare evaluator agreement separately for each generator. The PRM is Qwen-based and one generator is Qwen.
 
-## 9. Automated evaluation set-up (free tools)
+## 9. Compute, model access and automated evaluation (free tools)
+
+**Compute: Kaggle notebooks.**
+- Free GPU quota of about 30 hours/week (check the current figure on your Kaggle quota page). Choose the **GPU T4 ×2** accelerator.
+- **Phone verification is required** before GPU and internet can be turned on in notebook settings.
+- T4s don't support bf16, so load models in **fp16**.
+- Save outputs (JSONL) to `/kaggle/working` and download them, or publish them as a private Kaggle dataset, after each run. Sessions end after a time limit.
+- Estimated GPU use: about 1 hour for the dry run, about 3–6 hours for the screening pool, and about 1–2 hours for the PRM. That fits inside one week's quota.
+
+**Model access (Hugging Face).**
+- Qwen2.5-3B-Instruct and Phi-4-mini-instruct download without any approval.
+- **Llama-3.2-3B-Instruct is "gated":** you must accept Meta's licence on its Hugging Face page and wait for approval before it downloads. Steps:
+  1. Create a free account at huggingface.co.
+  2. Open `meta-llama/Llama-3.2-3B-Instruct` and fill in the licence form. Use your real name and university.
+  3. Wait for the "access granted" email.
+  4. Create a **Read** access token under Settings → Access Tokens.
+  5. In Kaggle, open Add-ons → Secrets, add it as `HF_TOKEN`, and log in from the notebook with `huggingface_hub.login()`.
+- **Fallback if access is refused or delayed for more than a week:** Kaggle's own Models hub also hosts Llama 3.2 behind a separate licence acceptance. Otherwise use the reserve model (Gemma-3-4B-it, which also needs a one-click licence acceptance).
+- **Never commit the token to git.**
+
 
 **LLM judge:** one free-tier API model from a family **not** among the generators (not Qwen, Llama or Phi), so the judge isn't rating its own family. As of Oct 2026, candidates are:
 - **Google Gemini API free tier** (Flash models). Limits are listed in AI Studio.
 - **Groq free tier: `gpt-oss-120b`** (about 30 requests/min, 1,000/day, OpenAI-compatible API).
 - **OpenRouter `:free` models** (50 requests/day without credit). Use only as a fallback.
 
-The workload is small: about 450 judge calls, plus about 400 calibration calls. Either of the first two fits inside a few days of free quota.
+The workload is small: about 360 judge calls, plus about 400 calibration calls. Either of the first two fits inside a few days of free quota.
 
 Rules for using the judge:
 - Temperature 0, JSON output, the frozen codebook in the prompt, and the gold answer given (reference-based, as in v1).
@@ -207,7 +268,7 @@ Rules for using the judge:
 - *Optional:* run a second free judge as a robustness check, if quota allows.
 
 **PRM:**
-- Run Qwen2.5-Math-PRM-7B on a free GPU notebook (Kaggle or Colab). In fp16 the 7B model needs about 15–16 GB, which is tight on a single T4.
+- Run Qwen2.5-Math-PRM-7B on Kaggle. In fp16 the 7B model needs about 15–16 GB, which is too tight for one T4, so **split it across both T4s** (`device_map="auto"`). Only the 180 math traces and about 400 ProcessBench items are scored.
 - **Fallback:** a smaller PRM (for example Skywork's 1.5B PRM), reported as such.
 - Avoid 4-bit quantisation if possible, because it changes the scores. If it is used, report it.
 
@@ -229,29 +290,31 @@ Rules for using the judge:
 | Format non-compliance | Dry-run gate, reserve model, format failures reported separately |
 | Taxonomy too fine | 4–6 parent categories; merge rare children at the parent level |
 | Annotation overruns | Freeze the codebook by week 5; cut RQ3 depth before cutting RQ1 |
+| Llama access delayed | Request it in week 1; use Kaggle Models or the reserve model as a fallback |
+| Supervisor review takes longer than a week | Do the RQ3 ProcessBench calibration while waiting; main annotation starts only after the freeze |
 | Free API changes or retirement | Run the judge in one window; log model IDs; keep a second provider ready |
-| PRM doesn't fit the free GPU | Smaller fallback PRM; Kaggle instead of Colab |
-| Single annotator | Self-re-annotation κ, supervisor review, optional 30-trace double-label |
+| PRM doesn't fit the free GPU | Split across Kaggle's 2×T4; otherwise a smaller fallback PRM |
+| Single annotator | Supervisor review, optional 24-trace blind supervisor label, 30-trace self-check |
 
 ## 12. Timeline (9 weeks)
 | Week | Activity | Output |
 |---|---|---|
-| 1 | Confirm open decisions; HF access to the models; prompt templates; dry run | Protocol v2 signed off; format check passed |
-| 2 | Build the pipeline; generate the screening pool (1,800 traces); score answers | Screening pool and accuracy table |
-| 3 | Stratified selection; discovery coding (60 traces) | Candidate categories |
-| 4 | Draft taxonomy and codebook | Codebook v0 |
-| 5 | Pilot (60 traces); supervisor review; **freeze** | Codebook v1.0 |
-| 6–7 | Main annotation (330); self-re-annotation sample | Annotated corpus |
-| 8 | RQ1 and RQ2 analysis; set up judge and PRM; ProcessBench calibration | Results |
-| 9 | RQ3 runs and analysis; write report | Final report |
+| 1 | Supervisor sign-off on v2; Kaggle phone verification; HF account and **Llama access request**; API key; prompt templates; dry run | Protocol agreed; format check passed |
+| 2 | Pipeline; screening pool (1,800 traces); answer scoring; stratified selection of the 360 | Accuracy table; annotation sheet |
+| 3 | Stage A informal read (~30 traces); taxonomy v0 and codebook draft | Codebook v0 |
+| 4 | Stage B pilot annotation (60); send to supervisor | Pilot labels and hard-case list |
+| 5 | Stage C supervisor review (optionally 24 blind labels); stage D revise and **freeze**. *Meanwhile:* ProcessBench calibration for RQ3 | Codebook v1.0 |
+| 6–7 | Stage E main annotation (300) and pilot re-label (60) | Corpus of 360 |
+| 8 | Stage F self-check (30); RQ1 and RQ2 analysis | Results |
+| 9 | RQ3: judge on 360, PRM on 180 math traces; write report | Final report |
 
 ## 13. Open decisions **[CONFIRM]**
-1. **Supervisor sign-off on stratified sampling.** It changes which claims are allowed: natural rates come from the screening pool, failure profiles from the stratified sample.
-2. **Compute:** a local GPU, or free Kaggle/Colab only?
-3. **Hugging Face account with gated access to Llama-3.2-3B-Instruct.** Request it now, because approval can take time.
+1. **Supervisor sign-off on stratified sampling** and on the 360-trace size. These change which claims are allowed: natural rates come from the screening pool, failure profiles from the stratified sample.
+2. ~~Compute~~: **decided, Kaggle.**
+3. **Llama access:** request it in week 1 (steps in §9).
 4. **Free API account** (Gemini and/or Groq), and whether your institution has rules about sending data to external APIs. The datasets are public, so this is usually fine.
-5. **Supervisor time:** review only, or also the 30-trace double-label?
-6. **Annotation time budget:** about 30–45 hours. Is that realistic alongside other work?
+5. **Supervisor involvement:** review only, or also the 24-trace blind labels? About 2 extra hours of their time, and it gives a real agreement figure.
+6. **Annotation time:** about 32 hours over weeks 3–8. Is that realistic alongside other work? If not, use the 300-trace fallback (§7.5).
 7. **Comparability with ReTraceQA:** should the final parent categories also map onto Misinterpretation / Hallucination / Reasoning?
 8. **Start date and hard deadline,** and the report format expected (lab report vs thesis chapter).
 
