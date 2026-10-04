@@ -1,9 +1,0 @@
-Answer the following multiple-choice question. Reason step by step.
-
-Write each step on its own line, numbered as "Step 1:", "Step 2:", and so on. Keep each step to one idea.
-After the last step, write the letter of your chosen option on its own line in exactly this format:
-Final answer: <letter>
-
-Question: {question}
-Options:
-{options}

@@ -1,7 +1,0 @@
-Solve the following math problem. Reason step by step.
-
-Write each step on its own line, numbered as "Step 1:", "Step 2:", and so on. Keep each step to one idea or calculation.
-After the last step, write the final answer on its own line in exactly this format:
-Final answer: <number>
-
-Problem: {question}
