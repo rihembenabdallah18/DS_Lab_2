@@ -80,12 +80,13 @@ Models to exclude from the main comparison:
   ```
   Solve the following math problem. Reason step by step.
   Write each step on its own line, numbered as "Step 1:", "Step 2:", and so on.
+  In the last step, state the result you have reached.
   After the last step, write the final answer on its own line in exactly this format:
   Final answer: <number>
 
   Problem: {question}
   ```
-  Commonsense (CommonsenseQA): the same wording, with `Question: {question}` followed by the options `A. … E.`, and `Final answer: <letter>`.
+  Commonsense (CommonsenseQA): the same wording, with `Question: {question}` followed by the options `A. … E.`, "In the last step, state which option you choose and why.", and `Final answer: <letter>`.
 
 - **Why this prompt** (relation to prior work):
 
@@ -97,6 +98,8 @@ Models to exclude from the main comparison:
   | Same prompt for every model | Fair comparison for RQ2 |
 
   *Risk:* a forced format can slightly change how a model reasons, and small models may ignore it. The dry run checks this. If ReTraceQA's exact prompt wording (paper appendix) is available, align the wording with it.
+
+- **Prompt revision (v1 → v2).** The first full run (prompt v1, kept in `data/traces/v1/`) showed that many commonsense traces compared the options but never stated which one they chose, leaving the decision to the `Final answer:` line. A rough keyword check found an explicit conclusion in only about 55% (Llama), 37% (Qwen) and 17% (Phi) of commonsense traces, against 86–97% of math traces ending with the computed result. The rate was the same for right and wrong answers, so it reflects a writing style encouraged by the prompt, not a reasoning failure, but it makes "do the steps support the answer?" hard to judge. v2 adds one sentence asking for the conclusion in the last step (above). It only asks the model to write the conclusion down, with no hints or examples, so the set-up stays zero-shot. **All 1,800 traces are regenerated with v2**, not only the affected ones: regenerating a subset chosen by its output would mix two prompts unevenly across models (confounding RQ2) and select on the outcome. The 42-trace pilot (§7.3) was drawn from v1 and is used only to build the taxonomy; all later annotation uses v2.
 - **Decoding:** greedy (temperature 0), max 512 new tokens, fixed library versions, fixed seed.
 - **Step segmentation:** split on `Step k:` markers, falling back to line breaks. **The same segmentation is used for human annotation, the judge and the PRM**, so step indices line up.
 - **Record per trace (JSONL):** `trace_id`, `task`, `dataset`, `item_id`, `question`, `options`, `gold`, `model_id`, `model_revision`, `prompt_version`, `decoding`, `raw_output`, `steps[]`, `pred`, `answer_correct`, `format_ok`, `timestamp`.
